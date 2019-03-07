@@ -73,7 +73,7 @@ function draw() {
 	strokeWeight(1);
 	textSize(12);
 	// if (drawObjs[1].brain)
-	// 	drawObjs[1].brain.draw(width / 2, height / 2, 500, 50, 40);
+	// 	drawObjs[1].brain.draw(width / 2, height / 2, 500, 50, 40, 5);
 
 	scale(ppm);
 	strokeWeight(1 / ppm);
@@ -260,24 +260,31 @@ class Animal {
 		endShape();
 		pop();
 
-		this.eyesOpen = this.alive
-			? this.eyesOpen ^ (random() < (this.eyesOpen ? 0.01 : 0.1))
-			: false;
-		for (let i = 0; i < 2; i++) {
-			let corner = i % 2 == 0 ? this.tailLeft : this.tailRight;
+		const drawEye = pos => {
 			push();
-			translate(corner.x, corner.y + 0.3);
+			translate(pos.x, pos.y + 0.3);
 			fill(200);
 			ellipse(0, 0, 0.5, 0.5);
-			if (this.eyesOpen) {
-				fill(0);
-				ellipse(0, 0.1, 0.2, 0.2);
+			if (this.alive) {
+				if (this.eyesOpen) {
+					fill(0);
+					ellipse(0, 0.1, 0.2, 0.2);
+				} else {
+					stroke(0);
+					line(0.2, 0, -0.2, 0);
+				}
 			} else {
 				stroke(0);
+				rotate(TAU * 0.125);
+				line(0.2, 0, -0.2, 0);
+				rotate(TAU * 0.25);
 				line(0.2, 0, -0.2, 0);
 			}
 			pop();
-		}
+		};
+
+		drawEye(this.tailLeft);
+		drawEye(this.tailRight);
 
 		pop();
 	}
@@ -322,7 +329,6 @@ world.on("begin-contact", contact => {
 		if (animal.alive) {
 			objsForRemoval.push(food);
 			animal.energy += food.body.getMass() * ANIMAL_ENERGY_EFFICIENCY;
-			console.log(animal.energy);
 		}
 	} else if (a instanceof Animal && b instanceof Animal) {
 		let animal1 = a,
