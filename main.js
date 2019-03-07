@@ -341,20 +341,7 @@ world.on("begin-contact", contact => {
 					y: dead.pos.y + pixToWorld(Math.cos(angle) * dist),
 					mass
 				});
-				/*let newFood = new Food(
-					world,
-					Math.sin(angle) * dist,
-					Math.cos(angle) * dist,
-					mass
-				);
-				console.log(newFood);
-				drawObjs.push(newFood);*/
 			}
 		}
-		/*if (animal.alive) {
-			objsForRemoval.push(food);
-			animal.energy += food.body.getMass() * ANIMAL_ENERGY_EFFICIENCY;
-			console.log(animal.energy);
-		}*/
 	}
 });
