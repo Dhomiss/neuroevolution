@@ -95,7 +95,7 @@ class Node {
 	forwardsTo(otherNode) {
 		let synapse = {
 			from: this,
-			weight: random(-1, 1),
+			weight: randomGaussian(0, 2 / 3),
 			to: otherNode
 		};
 		this.forward.push(synapse);

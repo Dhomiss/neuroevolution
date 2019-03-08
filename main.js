@@ -1,6 +1,5 @@
 /**
- * @TODO 	Vision, breeding, attacks, nutrition/energy balancing, and... evolution.
- * 			Also, NNs need gaussian weights.
+ * @TODO 	Vision, breeding, attacks, nutrition/energy balancing, and... well, evolution.
  */
 
 const pl = planck,
@@ -73,8 +72,8 @@ function draw() {
 
 	strokeWeight(1);
 	textSize(12);
-	// if (drawObjs[1].brain)
-	// 	drawObjs[1].brain.draw(width / 2, height / 2, 500, 50, 40, 5);
+	if (drawObjs[1].brain)
+		drawObjs[1].brain.draw(width / 2, height / 2, 500, 50, 40, 10);
 
 	scale(ppm);
 	strokeWeight(1 / ppm);
