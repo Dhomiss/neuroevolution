@@ -1,5 +1,6 @@
 /**
- * @TODO vision, breeding, attacks, nutrition/energy balancing. Also, NNs need gaussian weights
+ * @TODO 	Vision, breeding, attacks, nutrition/energy balancing, and... evolution.
+ * 			Also, NNs need gaussian weights.
  */
 
 const pl = planck,
@@ -260,6 +261,9 @@ class Animal {
 		endShape();
 		pop();
 
+		this.eyesOpen = this.alive
+			? this.eyesOpen ^ (random() < (this.eyesOpen ? 0.01 : 0.1))
+			: false;
 		const drawEye = pos => {
 			push();
 			translate(pos.x, pos.y + 0.3);
