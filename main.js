@@ -81,7 +81,7 @@ function draw() {
 	textSize(50 / ppm);
 
 	animals.forEach(animal => {
-		if (animal.alive) animal.update();
+		animal.update();
 	});
 	drawObjs.forEach(obj => {
 		obj.draw();
@@ -166,6 +166,7 @@ class Animal {
 				restitution: 0
 			}
 		);
+
 		this.body.setUserData(this);
 		this.pos = this.body.getPosition();
 		this.swimForce = 0;
@@ -180,42 +181,6 @@ class Animal {
 	}
 
 	update() {
-		if (this.brain) {
-			this.brain.layers[0][0].value = map(
-				noise(frameCount / 100),
-				0,
-				1,
-				-2,
-				2
-			);
-			this.brain.compute();
-			this.swimForce =
-				this.brain.layers.output[0].value * ANIMAL_MAX_FORCE;
-			this.turnForce =
-				this.brain.layers.output[1].value * ANIMAL_MAX_FORCE;
-		} else {
-			this.swimForce = 0;
-			this.turnForce = 0;
-			this.swimForce += controls.up ? ANIMAL_MAX_FORCE : 0;
-			this.swimForce += controls.down ? -ANIMAL_MAX_FORCE : 0;
-			this.turnForce += controls.left ? -ANIMAL_MAX_FORCE : 0;
-			this.turnForce += controls.right ? ANIMAL_MAX_FORCE : 0;
-		}
-
-		this.energyExpense += Math.abs(this.swimForce || this.turnForce) * 0.01;
-		this.effortMade += wrapMod((this.swimForce || this.turnForce) * 2, TAU);
-
-		if (this.swimForce)
-			this.body.applyLinearImpulse(
-				new Vec(
-					Math.sin(-this.body.getAngle()),
-					Math.cos(-this.body.getAngle())
-				).mul(this.swimForce),
-				this.pos,
-				true
-			);
-		if (this.turnForce) this.body.applyAngularImpulse(this.turnForce, true);
-
 		this.body.setLinearVelocity(
 			this.body.getLinearVelocity().mul(this.world.drag)
 		);
@@ -223,10 +188,53 @@ class Animal {
 			this.body.getAngularVelocity() * this.world.angularDrag
 		);
 
-		this.energy -= this.energyExpense + AMBIENT_ENERGY_EXPENSE;
-		if (this.energy <= 0) this.alive = false;
+		if (this.alive) {
+			if (this.brain) {
+				this.brain.layers[0][0].value = map(
+					noise(frameCount / 100),
+					0,
+					1,
+					-2,
+					2
+				);
+				this.brain.compute();
+				this.swimForce =
+					this.brain.layers.output[0].value * ANIMAL_MAX_FORCE;
+				this.turnForce =
+					this.brain.layers.output[1].value * ANIMAL_MAX_FORCE;
+			} else {
+				this.swimForce = 0;
+				this.turnForce = 0;
+				this.swimForce += controls.up ? ANIMAL_MAX_FORCE : 0;
+				this.swimForce += controls.down ? -ANIMAL_MAX_FORCE : 0;
+				this.turnForce += controls.left ? -ANIMAL_MAX_FORCE : 0;
+				this.turnForce += controls.right ? ANIMAL_MAX_FORCE : 0;
+			}
 
-		spawnFood();
+			this.energyExpense +=
+				Math.abs(this.swimForce || this.turnForce) * 0.01;
+			this.effortMade += wrapMod(
+				(this.swimForce || this.turnForce) * 2,
+				TAU
+			);
+
+			if (this.swimForce)
+				this.body.applyLinearImpulse(
+					new Vec(
+						Math.sin(-this.body.getAngle()),
+						Math.cos(-this.body.getAngle())
+					).mul(this.swimForce),
+					this.pos,
+					true
+				);
+			if (this.turnForce)
+				this.body.applyAngularImpulse(this.turnForce, true);
+
+			this.energy -= this.energyExpense + AMBIENT_ENERGY_EXPENSE;
+			if (this.energy <= 0) this.alive = false;
+
+			spawnFood();
+		}
 	}
 
 	draw() {
@@ -332,7 +340,8 @@ world.on("begin-contact", contact => {
 		let food = a instanceof Food ? a : b;
 		if (animal.alive) {
 			objsForRemoval.push(food);
-			animal.energy += food.body.getMass() * ANIMAL_ENERGY_EFFICIENCY;
+			animal.energy +=
+				food.body.getMass() * 1000 * ANIMAL_ENERGY_EFFICIENCY;
 		}
 	} else if (a instanceof Animal && b instanceof Animal) {
 		let animal1 = a,
