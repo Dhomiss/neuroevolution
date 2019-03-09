@@ -37,7 +37,7 @@ function setup() {
 	createCanvas(600, 600);
 	frameRate(MAX_TICK_RATE);
 
-	for (let i = 0; i < 10; i++) {
+	for (let i = 0; i < 50; i++) {
 		addAnimal(
 			new Animal(
 				world,
@@ -66,15 +66,14 @@ function setup() {
 
 function draw() {
 	//if (keyIsPressed) keyDown();
-	world.step(1 / (frameRate() || MAX_TICK_RATE));
+	world.step(1 / MAX_TICK_RATE /*(frameRate() || MAX_TICK_RATE)*/);
 	colorMode(RGB);
 	background(0);
 
-	strokeWeight(1);
-	textSize(12);
-	if (drawObjs[1].brain)
+	if (drawObjs.length > 2 && drawObjs[1].brain)
 		drawObjs[1].brain.draw(width / 2, height / 2, 500, 50, 40, 10);
 
+	push();
 	scale(ppm);
 	strokeWeight(1 / ppm);
 	textSize(50 / ppm);
@@ -87,6 +86,14 @@ function draw() {
 	});
 
 	removeObjs();
+	pop();
+
+	strokeWeight(1);
+	textSize(18);
+	textAlign(LEFT, LEFT);
+	stroke(0);
+	fill("#F00");
+	text(frameRate().toFixed(2), 20, 10);
 }
 
 function removeObjs() {
@@ -133,7 +140,7 @@ class Food {
 }
 
 function mousePressed() {
-	//drawObjs.push(new Food(world, pixToWorld(mouseX), pixToWorld(mouseY), 1));
+	drawObjs.push(new Food(world, pixToWorld(mouseX), pixToWorld(mouseY), 0.1));
 }
 
 const ANIMAL_MAX_FORCE = 0.1;
@@ -319,6 +326,13 @@ function keyPressed() {
 }
 keyReleased = keyPressed;
 
+/**
+ * atan2 but it's actually useful
+ */
+function satan2(x, y) {
+	return wrapMod(atan2(x, y) + PI, TAU);
+}
+
 function wrapMod(n, mod) {
 	return ((n % mod) + mod) % mod;
 }
@@ -337,7 +351,13 @@ world.on("begin-contact", contact => {
 	if (a instanceof Animal && b instanceof Food) {
 		let animal = a instanceof Animal ? a : b;
 		let food = a instanceof Food ? a : b;
-		if (animal.alive) {
+
+		let foodRel = food.pos.sub(animal.pos);
+		let foodAngle = satan2(foodRel.x, foodRel.y);
+		let animAngle = wrapMod(-animal.body.getAngle() + PI, TAU); //angles need to be adjusted to align with eachother 😤
+		let theta = foodAngle - animAngle;
+		let facingFood = -PI / 2 < theta && theta < PI / 2;
+		if (animal.alive && facingFood) {
 			objsForRemoval.push(food);
 			animal.energy +=
 				food.body.getMass() * 1000 * ANIMAL_ENERGY_EFFICIENCY;
