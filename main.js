@@ -33,16 +33,14 @@ function pixToWorld(n) {
 function addAnimal(animal) {
 	drawObjs.push(animal);
 	animals.push(animal);
+	return animal;
 }
 
 function setup() {
 	createCanvas(600, 600);
 	frameRate(MAX_TICK_RATE);
 
-	player = new Animal(world, pixToWorld(width / 2), pixToWorld(height / 2));
-	addAnimal(player);
-
-	const INITIAL_ANIMALS = 1;
+	const INITIAL_ANIMALS = 50;
 	for (let i = 0; i < INITIAL_ANIMALS; i++) {
 		addAnimal(
 			new Animal(
@@ -54,7 +52,9 @@ function setup() {
 			)
 		);
 	}
-	animals[1].energy = 0;
+	// player = addAnimal(
+	// 	new Animal(world, pixToWorld(width / 2), pixToWorld(height / 2))
+	// );
 
 	let tl = new Vec();
 	let tr = new Vec(pixToWorld(width), 0);
@@ -101,8 +101,10 @@ function draw() {
 	stroke(0);
 	fill("#F00");
 	text(frameRate().toFixed(2), 20, 20);
-	fill("#F00");
-	text(player.energy, 20, 40);
+	if (player) {
+		fill("#F00");
+		text(player.energy, 20, 40);
+	}
 }
 
 function removeObjs() {
@@ -237,7 +239,7 @@ class Animal {
 		this.energyExpense = 0;
 		this.hue = random(255);
 		this.lastShot = 0;
-		this.proximateObjs = null;
+		this.proximateObjs = [];
 	}
 
 	update() {
@@ -248,7 +250,7 @@ class Animal {
 					Vec.distance(this.pos, otherObj.pos)
 				);
 			})
-			.filter((obj, i) => {
+			.filter(({ i }) => {
 				return i != 0;
 			});
 
@@ -436,7 +438,6 @@ function keyPressed() {
 
 	// if (keyIsDown(76))
 	// 	addAnimal(new Animal(world, pixToWorld(mouseX), pixToWorld(mouseY)));
-	console.log(player.proximateObjs);
 }
 keyReleased = keyPressed;
 
