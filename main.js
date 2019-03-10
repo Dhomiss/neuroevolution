@@ -237,9 +237,21 @@ class Animal {
 		this.energyExpense = 0;
 		this.hue = random(255);
 		this.lastShot = 0;
+		this.proximateObjs = null;
 	}
 
 	update() {
+		this.proximateObjs = drawObjs
+			.sort((obj, otherObj) => {
+				return (
+					Vec.distance(this.pos, obj.pos) >
+					Vec.distance(this.pos, otherObj.pos)
+				);
+			})
+			.filter((obj, i) => {
+				return i != 0;
+			});
+
 		this.body.setLinearVelocity(
 			this.body.getLinearVelocity().mul(this.world.drag)
 		);
@@ -336,13 +348,20 @@ class Animal {
 		this.eyesOpen = this.alive
 			? this.eyesOpen ^ (random() < (this.eyesOpen ? 0.01 : 0.1))
 			: false;
-		const drawEye = pos => {
+		const drawEye = (pos, quarry = null) => {
 			push();
 			translate(pos.x, pos.y + 0.3);
 			fill(200);
 			ellipse(0, 0, 0.5, 0.5);
 			if (this.alive) {
 				if (this.eyesOpen) {
+					if (quarry) {
+						let quarryRel = Vec.sub(Vec.add(this.pos, pos), quarry);
+						rotate(
+							-satan2(quarryRel.x, quarryRel.y) -
+								this.body.getAngle()
+						);
+					}
 					fill(0);
 					ellipse(0, 0.1, 0.2, 0.2);
 				} else {
@@ -359,8 +378,18 @@ class Animal {
 			pop();
 		};
 
-		drawEye(this.tailLeft);
-		drawEye(this.tailRight);
+		drawEye(
+			this.tailLeft,
+			this.proximateObjs[0] ? this.proximateObjs[0].pos : null
+		);
+		drawEye(
+			this.tailRight,
+			this.proximateObjs[1]
+				? this.proximateObjs[1].pos
+				: this.proximateObjs[0]
+				? this.proximateObjs[0].pos
+				: null
+		);
 
 		pop();
 	}
@@ -407,6 +436,7 @@ function keyPressed() {
 
 	// if (keyIsDown(76))
 	// 	addAnimal(new Animal(world, pixToWorld(mouseX), pixToWorld(mouseY)));
+	console.log(player.proximateObjs);
 }
 keyReleased = keyPressed;
 
