@@ -1,5 +1,5 @@
 /**
- * @TODO 	Vision, breeding, attacks, nutrition/energy balancing, and... well, evolution.
+ * @TODO	Vision, breeding, attacks, nutrition/energy balancing, and... well, evolution.
  */
 
 const pl = planck,
@@ -37,7 +37,7 @@ function setup() {
 	createCanvas(600, 600);
 	frameRate(MAX_TICK_RATE);
 
-	for (let i = 0; i < 50; i++) {
+	for (let i = 0; i < 1; i++) {
 		addAnimal(
 			new Animal(
 				world,
@@ -48,6 +48,7 @@ function setup() {
 			)
 		);
 	}
+	animals[0].energy = 0;
 
 	let tl = new Vec();
 	let tr = new Vec(pixToWorld(width), 0);
@@ -144,6 +145,7 @@ function mousePressed() {
 }
 
 const ANIMAL_MAX_FORCE = 0.1;
+const ENERGY_EXPENSE_MULTIPLIER = 0.01;
 const AMBIENT_ENERGY_EXPENSE = 0.001;
 const START_HEALTH = 1000;
 class Animal {
@@ -218,7 +220,8 @@ class Animal {
 			}
 
 			this.energyExpense +=
-				Math.abs(this.swimForce || this.turnForce) * 0.01;
+				Math.abs(this.swimForce || this.turnForce) *
+				ENERGY_EXPENSE_MULTIPLIER;
 			this.effortMade += wrapMod(
 				(this.swimForce || this.turnForce) * 2,
 				TAU
@@ -352,11 +355,7 @@ world.on("begin-contact", contact => {
 		let animal = a instanceof Animal ? a : b;
 		let food = a instanceof Food ? a : b;
 
-		let foodRel = food.pos.sub(animal.pos);
-		let foodAngle = satan2(foodRel.x, foodRel.y);
-		let animAngle = wrapMod(-animal.body.getAngle() + PI, TAU); //angles need to be adjusted to align with eachother 😤
-		let theta = foodAngle - animAngle;
-		let facingFood = -PI / 2 < theta && theta < PI / 2;
+		let facingFood = isFacing(animal, food);
 		if (animal.alive && facingFood) {
 			objsForRemoval.push(food);
 			animal.energy +=
@@ -366,20 +365,32 @@ world.on("begin-contact", contact => {
 		let animal1 = a,
 			animal2 = b;
 		if (animal1.alive ^ animal2.alive) {
-			let dead = animal1.alive ? animal2 : animal1;
-			objsForRemoval.push(dead);
-			let foodCount = 10;
-			let mass = dead.body.getMass() / foodCount;
-			for (let i = 0; i < foodCount; i++) {
-				let angle = random(TAU);
-				let dist = random(2);
-				foodToSpawn.push({
-					world,
-					x: dead.pos.x + pixToWorld(Math.sin(angle) * dist),
-					y: dead.pos.y + pixToWorld(Math.cos(angle) * dist),
-					mass
-				});
+			let corpse = animal1.alive ? animal2 : animal1;
+			let scavenger = animal2.alive ? animal2 : animal1;
+
+			if (isFacing(scavenger, corpse)) {
+				objsForRemoval.push(corpse);
+				let foodCount = 10;
+				let mass = corpse.body.getMass() / foodCount;
+				for (let i = 0; i < foodCount; i++) {
+					let angle = random(TAU);
+					let dist = random(2);
+					foodToSpawn.push({
+						world,
+						x: corpse.pos.x + pixToWorld(Math.sin(angle) * dist),
+						y: corpse.pos.y + pixToWorld(Math.cos(angle) * dist),
+						mass
+					});
+				}
 			}
 		}
 	}
 });
+
+function isFacing(obj, targ) {
+	let targRel = Vec.sub(targ.pos, obj.pos);
+	let targAngle = satan2(targRel.x, targRel.y);
+	let objAngle = wrapMod(-obj.body.getAngle() + Math.PI, TAU);
+	let theta = targAngle - objAngle;
+	return -PI / 2 < theta && theta < PI / 2;
+}
