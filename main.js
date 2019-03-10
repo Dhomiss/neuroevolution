@@ -1,5 +1,5 @@
 /**
- * @TODO	Vision, breeding, attacks, nutrition/energy balancing, and... well, evolution.
+ * @TODO	Vision, breeding, nutrition/energy balancing, and... well, evolution.
  */
 
 const pl = planck,
@@ -16,6 +16,8 @@ let drawObjs = [];
 let animals = [];
 let objsForRemoval = [];
 let foodToSpawn = [];
+
+let player = null;
 
 function spawnFood() {
 	foodToSpawn.forEach(food => {
@@ -37,7 +39,11 @@ function setup() {
 	createCanvas(600, 600);
 	frameRate(MAX_TICK_RATE);
 
-	for (let i = 0; i < 1; i++) {
+	player = new Animal(world, pixToWorld(width / 2), pixToWorld(height / 2));
+	addAnimal(player);
+
+	const INITIAL_ANIMALS = 1;
+	for (let i = 0; i < INITIAL_ANIMALS; i++) {
 		addAnimal(
 			new Animal(
 				world,
@@ -48,7 +54,7 @@ function setup() {
 			)
 		);
 	}
-	animals[0].energy = 0;
+	animals[1].energy = 0;
 
 	let tl = new Vec();
 	let tr = new Vec(pixToWorld(width), 0);
@@ -71,8 +77,8 @@ function draw() {
 	colorMode(RGB);
 	background(0);
 
-	if (drawObjs.length > 2 && drawObjs[1].brain)
-		drawObjs[1].brain.draw(width / 2, height / 2, 500, 50, 40, 10);
+	if (animals.length > 2 && animals[1].brain)
+		animals[1].brain.draw(width / 2, height / 2, 500, 50, 40, 10);
 
 	push();
 	scale(ppm);
@@ -86,15 +92,17 @@ function draw() {
 		obj.draw();
 	});
 
-	removeObjs();
 	pop();
+	removeObjs();
 
 	strokeWeight(1);
 	textSize(18);
 	textAlign(LEFT, LEFT);
 	stroke(0);
 	fill("#F00");
-	text(frameRate().toFixed(2), 20, 10);
+	text(frameRate().toFixed(2), 20, 20);
+	fill("#F00");
+	text(player.energy, 20, 40);
 }
 
 function removeObjs() {
@@ -140,14 +148,56 @@ class Food {
 	}
 }
 
+const BULLET_VEL = 10;
+class Bullet {
+	constructor(world, animal) {
+		this.world = world;
+		this.radius = 0.1;
+		let position = new Vec(
+			animal.pos.x + Math.sin(-animal.body.getAngle()) * 1.5,
+			animal.pos.y + Math.cos(-animal.body.getAngle()) * 1.5
+		);
+		this.body = world.createBody({
+			type: "dynamic",
+			position
+		});
+		this.body.createFixture(new pl.Circle(this.radius), {
+			density: 1,
+			friction: 1,
+			restitution: 0
+		});
+		this.body.setUserData(this);
+		this.pos = this.body.getPosition();
+		this.body.setLinearVelocity(
+			new Vec(
+				Math.sin(-animal.body.getAngle()) * BULLET_VEL,
+				Math.cos(-animal.body.getAngle()) * BULLET_VEL
+			)
+		);
+	}
+
+	draw() {
+		push();
+		translate(this.pos.x, this.pos.y);
+		rotate(this.body.getAngle());
+		noStroke();
+		fill(64);
+		ellipse(0, 0, this.radius * 2, this.radius * 2);
+		pop();
+	}
+}
+
 function mousePressed() {
 	drawObjs.push(new Food(world, pixToWorld(mouseX), pixToWorld(mouseY), 0.1));
 }
 
 const ANIMAL_MAX_FORCE = 0.1;
-const ENERGY_EXPENSE_MULTIPLIER = 0.01;
-const AMBIENT_ENERGY_EXPENSE = 0.001;
+const ENERGY_EXPENSE_MULTIPLIER = 1.5;
+const AMBIENT_ENERGY_EXPENSE = 0.2;
+const ANIMAL_ENERGY_EFFICIENCY = 0.5;
+const FOOD_MASS_TO_ENERGY_MULTIPLIER = 1000;
 const START_HEALTH = 1000;
+const BULLET_TIMEOUT = 1000;
 class Animal {
 	constructor(world, x, y, size = 1, brain = null) {
 		this.world = world;
@@ -186,6 +236,7 @@ class Animal {
 		this.alive = true;
 		this.energyExpense = 0;
 		this.hue = random(255);
+		this.lastShot = 0;
 	}
 
 	update() {
@@ -217,6 +268,8 @@ class Animal {
 				this.swimForce += controls.down ? -ANIMAL_MAX_FORCE : 0;
 				this.turnForce += controls.left ? -ANIMAL_MAX_FORCE : 0;
 				this.turnForce += controls.right ? ANIMAL_MAX_FORCE : 0;
+
+				if (controls.shoot) this.shoot();
 			}
 
 			this.energyExpense +=
@@ -243,6 +296,8 @@ class Animal {
 			if (this.energy <= 0) this.alive = false;
 
 			spawnFood();
+
+			this.energyExpense = 0;
 		}
 	}
 
@@ -309,23 +364,49 @@ class Animal {
 
 		pop();
 	}
+
+	shoot() {
+		if (millis() - this.lastShot > BULLET_TIMEOUT) {
+			drawObjs.push(new Bullet(this.world, this));
+			this.lastShot = millis();
+		}
+	}
+
+	decompose() {
+		objsForRemoval.push(this);
+		let foodCount = 10;
+		let mass = this.body.getMass() / foodCount;
+		for (let i = 0; i < foodCount; i++) {
+			let angle = random(TAU);
+			let dist = random(2);
+			foodToSpawn.push({
+				world,
+				x: this.pos.x + pixToWorld(Math.sin(angle) * dist),
+				y: this.pos.y + pixToWorld(Math.cos(angle) * dist),
+				mass
+			});
+		}
+	}
 }
 
 let controls = {
 	up: false,
 	down: false,
 	left: false,
-	right: false
+	right: false,
+	shoot: false
 };
 
 function keyPressed() {
+	//console.log(keyCode);
 	controls.up = keyIsDown(87) || false;
 	controls.down = keyIsDown(83) || false;
 	controls.left = keyIsDown(65) || false;
 	controls.right = keyIsDown(68) || false;
+	controls.shoot = keyIsDown(32) || false;
 
-	if (keyIsDown(76))
-		addAnimal(new Animal(world, pixToWorld(mouseX), pixToWorld(mouseY)));
+	// if (keyIsDown(76))
+	// 	addAnimal(new Animal(world, pixToWorld(mouseX), pixToWorld(mouseY)));
 }
 keyReleased = keyPressed;
 
@@ -340,7 +421,6 @@ function wrapMod(n, mod) {
 	return ((n % mod) + mod) % mod;
 }
 
-const ANIMAL_ENERGY_EFFICIENCY = 0.9;
 world.on("begin-contact", contact => {
 	let a = contact
 			.getFixtureA()
@@ -351,7 +431,10 @@ world.on("begin-contact", contact => {
 			.getBody()
 			.getUserData();
 
-	if (a instanceof Animal && b instanceof Food) {
+	if (
+		(a instanceof Animal && b instanceof Food) ||
+		(b instanceof Animal && a instanceof Food)
+	) {
 		let animal = a instanceof Animal ? a : b;
 		let food = a instanceof Food ? a : b;
 
@@ -359,7 +442,9 @@ world.on("begin-contact", contact => {
 		if (animal.alive && facingFood) {
 			objsForRemoval.push(food);
 			animal.energy +=
-				food.body.getMass() * 1000 * ANIMAL_ENERGY_EFFICIENCY;
+				food.body.getMass() *
+				FOOD_MASS_TO_ENERGY_MULTIPLIER *
+				ANIMAL_ENERGY_EFFICIENCY;
 		}
 	} else if (a instanceof Animal && b instanceof Animal) {
 		let animal1 = a,
@@ -369,22 +454,21 @@ world.on("begin-contact", contact => {
 			let scavenger = animal2.alive ? animal2 : animal1;
 
 			if (isFacing(scavenger, corpse)) {
-				objsForRemoval.push(corpse);
-				let foodCount = 10;
-				let mass = corpse.body.getMass() / foodCount;
-				for (let i = 0; i < foodCount; i++) {
-					let angle = random(TAU);
-					let dist = random(2);
-					foodToSpawn.push({
-						world,
-						x: corpse.pos.x + pixToWorld(Math.sin(angle) * dist),
-						y: corpse.pos.y + pixToWorld(Math.cos(angle) * dist),
-						mass
-					});
-				}
+				corpse.decompose();
 			}
 		}
+	} else if (
+		(a instanceof Animal && b instanceof Bullet) ||
+		(b instanceof Animal && a instanceof Bullet)
+	) {
+		let animal = a instanceof Animal ? a : b;
+		let bullet = a instanceof Bullet ? a : b;
+
+		animal.decompose();
 	}
+
+	if (a instanceof Bullet) objsForRemoval.push(a);
+	if (b instanceof Bullet) objsForRemoval.push(b);
 });
 
 function isFacing(obj, targ) {
