@@ -13,9 +13,11 @@ world.drag = 0.99;
 let ppm = 20; //Pixels Per Metre!
 
 let drawObjs = [];
+let updateObjs = [];
 let animals = [];
 let objsForRemoval = [];
 let foodToSpawn = [];
+let eggsToSpawn = [];
 
 let player = null;
 
@@ -32,6 +34,7 @@ function pixToWorld(n) {
 
 function addAnimal(animal) {
 	drawObjs.push(animal);
+	updateObjs.push(animal);
 	animals.push(animal);
 	return animal;
 }
@@ -40,7 +43,7 @@ function setup() {
 	createCanvas(600, 600);
 	frameRate(MAX_TICK_RATE);
 
-	const INITIAL_ANIMALS = 50;
+	const INITIAL_ANIMALS = 0;
 	for (let i = 0; i < INITIAL_ANIMALS; i++) {
 		addAnimal(
 			new Animal(
@@ -52,9 +55,11 @@ function setup() {
 			)
 		);
 	}
-	// player = addAnimal(
-	// 	new Animal(world, pixToWorld(width / 2), pixToWorld(height / 2))
-	// );
+	player = addAnimal(
+		new Animal(world, pixToWorld(width / 2), pixToWorld(height / 2))
+	);
+	player.body.setAngle(PI);
+	addAnimal(new Animal(world, pixToWorld(width / 2), pixToWorld(height / 2)));
 
 	let tl = new Vec();
 	let tr = new Vec(pixToWorld(width), 0);
@@ -85,8 +90,8 @@ function draw() {
 	strokeWeight(1 / ppm);
 	textSize(50 / ppm);
 
-	animals.forEach(animal => {
-		animal.update();
+	updateObjs.forEach(obj => {
+		obj.update();
 	});
 	drawObjs.forEach(obj => {
 		obj.draw();
@@ -94,6 +99,8 @@ function draw() {
 
 	pop();
 	removeObjs();
+	spawnFood();
+	spawnEggs();
 
 	strokeWeight(1);
 	textSize(18);
@@ -111,6 +118,9 @@ function removeObjs() {
 	if (objsForRemoval.length) {
 		objsForRemoval.forEach(obj => {
 			obj.world.destroyBody(obj.body);
+		});
+		updateObjs = updateObjs.filter(obj => {
+			return objsForRemoval.indexOf(obj) < 0;
 		});
 		drawObjs = drawObjs.filter(obj => {
 			return objsForRemoval.indexOf(obj) < 0;
@@ -200,6 +210,7 @@ const ANIMAL_ENERGY_EFFICIENCY = 0.5;
 const FOOD_MASS_TO_ENERGY_MULTIPLIER = 1000;
 const START_HEALTH = 1000;
 const BULLET_TIMEOUT = 1000;
+const MATING_DURATION = 1000;
 class Animal {
 	constructor(world, x, y, size = 1, brain = null) {
 		this.world = world;
@@ -240,6 +251,9 @@ class Animal {
 		this.hue = random(255);
 		this.lastShot = 0;
 		this.proximateObjs = [];
+		this.name = generateName();
+		this.mate = null;
+		this.mateTime = 0;
 	}
 
 	update() {
@@ -250,7 +264,7 @@ class Animal {
 					Vec.distance(this.pos, otherObj.pos)
 				);
 			})
-			.filter(({ i }) => {
+			.filter((obj, i) => {
 				return i != 0;
 			});
 
@@ -308,8 +322,6 @@ class Animal {
 
 			this.energy -= this.energyExpense + AMBIENT_ENERGY_EXPENSE;
 			if (this.energy <= 0) this.alive = false;
-
-			spawnFood();
 
 			this.energyExpense = 0;
 		}
@@ -392,7 +404,6 @@ class Animal {
 				? this.proximateObjs[0].pos
 				: null
 		);
-
 		pop();
 	}
 
@@ -420,6 +431,64 @@ class Animal {
 	}
 }
 
+const EGG_RADIUS = 0.25;
+class Egg {
+	constructor(mum, dad) {
+		this.world = mum.world;
+		this.radius = EGG_RADIUS;
+		this.body = this.world.createBody({
+			type: "dynamic",
+			position: Vec(mum.pos.x, mum.pos.y)
+		});
+		this.body.createFixture(new pl.Circle(this.radius), {
+			density: 0.8,
+			friction: 0.8,
+			restitution: 0.4
+		});
+		this.body.setUserData(this);
+		this.pos = this.body.getPosition();
+		this.born = millis();
+	}
+
+	update() {
+		if (millis() - this.born > 20000) {
+			objsForRemoval.push(this);
+			addAnimal(
+				new Animal(
+					this.world,
+					this.pos.x,
+					this.pos.y,
+					1,
+					new NeuralNetwork([1, 3, 2])
+				)
+			);
+		}
+	}
+
+	draw() {
+		push();
+		translate(this.pos.x, this.pos.y);
+		rotate(this.body.getAngle());
+		noStroke();
+		fill("#FF9");
+		ellipse(0, 0, this.radius * 2, this.radius * 2 * 1.2);
+		pop();
+	}
+}
+
+function addEgg(mum, dad) {
+	eggsToSpawn.push({ mum, dad });
+}
+
+function spawnEggs() {
+	eggsToSpawn.forEach(egg => {
+		let newEgg = new Egg(egg.mum, egg.dad);
+		updateObjs.push(newEgg);
+		drawObjs.push(newEgg);
+	});
+	eggsToSpawn = [];
+}
+
 let controls = {
 	up: false,
 	down: false,
@@ -438,6 +507,9 @@ function keyPressed() {
 
 	// if (keyIsDown(76))
 	// 	addAnimal(new Animal(world, pixToWorld(mouseX), pixToWorld(mouseY)));
+	if (keyIsDown(81)) {
+		console.log(player);
+	}
 }
 keyReleased = keyPressed;
 
@@ -487,19 +559,53 @@ world.on("begin-contact", contact => {
 			if (isFacing(scavenger, corpse)) {
 				corpse.decompose();
 			}
+		} else if (animal1.alive && animal2.alive) {
+			if (!animal1.mate && !animal2.mate) {
+				animal1.mate = animal2;
+				animal2.mate = animal1;
+				animal1.mateTime = animal2.mateTime = millis();
+			}
 		}
 	} else if (
 		(a instanceof Animal && b instanceof Bullet) ||
 		(b instanceof Animal && a instanceof Bullet)
 	) {
 		let animal = a instanceof Animal ? a : b;
-		let bullet = a instanceof Bullet ? a : b;
 
 		animal.decompose();
 	}
 
 	if (a instanceof Bullet) objsForRemoval.push(a);
 	if (b instanceof Bullet) objsForRemoval.push(b);
+});
+
+world.on("end-contact", contact => {
+	let a = contact
+			.getFixtureA()
+			.getBody()
+			.getUserData(),
+		b = contact
+			.getFixtureB()
+			.getBody()
+			.getUserData();
+	if (a instanceof Animal && b instanceof Animal) {
+		let john = a,
+			sally = b;
+		if (john.mate == sally && sally.mate == john) {
+			john.mate = null;
+			sally.mate = null;
+			if (
+				millis() - john.mateTime > MATING_DURATION &&
+				millis() - sally.mateTime > MATING_DURATION
+			) {
+				addEgg(sally, john);
+				sally.enery -= 500;
+				john.energy -= 500;
+			}
+			john.mateTime = 0;
+			sally.mateTime = 0;
+		}
+	}
 });
 
 function isFacing(obj, targ) {
